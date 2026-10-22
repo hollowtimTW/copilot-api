@@ -29,12 +29,31 @@ import { mapOpenAIStopReasonToAnthropic } from "./utils"
 export function translateToOpenAI(
   payload: AnthropicMessagesPayload,
 ): ChatCompletionsPayload {
+  const messages = translateAnthropicMessagesToOpenAI(
+    payload.messages,
+    payload.system,
+  )
+
+  // Fix for assistant message prefill: Copilot API does not support ending with an assistant message
+  if (messages.length > 0) {
+    const lastMessage = messages.at(-1)
+
+    if (
+      lastMessage
+      && lastMessage.role === "assistant"
+      && (!lastMessage.tool_calls || lastMessage.tool_calls.length === 0)
+    ) {
+      messages.push({
+        role: "user",
+        content:
+          "Please continue exactly where you left off. Do not output any conversational text or acknowledge this message, just output the exact continuation of your previous message.",
+      })
+    }
+  }
+
   return {
     model: translateModelName(payload.model),
-    messages: translateAnthropicMessagesToOpenAI(
-      payload.messages,
-      payload.system,
-    ),
+    messages,
     max_tokens: payload.max_tokens,
     stop: payload.stop_sequences,
     stream: payload.stream,
